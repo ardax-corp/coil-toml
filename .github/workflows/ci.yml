@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  CI: "true"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout coil-lang
+        uses: actions/checkout@v4
+        with:
+          repository: ardax-corp/coil-lang
+          path: .ci/coil-lang
+          submodules: false
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libffi-dev build-essential
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .ci/coil-lang
+
+      - name: Build coil
+        run: cargo build --bin coil --manifest-path .ci/coil-lang/Cargo.toml
+
+      - name: Language harness (`coil test`)
+        run: .ci/coil-lang/target/debug/coil test
