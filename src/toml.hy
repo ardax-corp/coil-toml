@@ -23,19 +23,19 @@ const FLT_INF: int = 1;
 const FLT_NAN: int = 2;
 
 class Store {
-    tags: Vec<int>,
-    flags: Vec<bool>,
-    ints: Vec<int>,
-    floats: Vec<float>,
-    strs: Vec<string>,
-    keys: Vec<string>,
-    first: Vec<int>,
-    last: Vec<int>,
-    next: Vec<int>,
+    pub tags: Vec<int>,
+    pub flags: Vec<bool>,
+    pub ints: Vec<int>,
+    pub floats: Vec<float>,
+    pub strs: Vec<string>,
+    pub keys: Vec<string>,
+    pub first: Vec<int>,
+    pub last: Vec<int>,
+    pub next: Vec<int>,
 }
 
 impl Store {
-    static fn new() -> Store {
+    pub static fn new() -> Store {
         return new Store(
             Vec::new(),
             Vec::new(),
@@ -49,7 +49,7 @@ impl Store {
         );
     }
 
-    fn add(int tag, bool flag, int n, float x, string s, string key) -> int {
+    pub fn add(int tag, bool flag, int n, float x, string s, string key) -> int {
         let idx = len(self.tags);
         self.tags.push(tag);
         self.flags.push(flag);
@@ -63,7 +63,7 @@ impl Store {
         return idx;
     }
 
-    fn attach(int parent, int child) {
+    pub fn attach(int parent, int child) {
         if self.first[parent] < 0 {
             self.first[parent] = child;
             self.last[parent] = child;
@@ -73,7 +73,7 @@ impl Store {
         }
     }
 
-    fn count_children(int idx) -> int {
+    pub fn count_children(int idx) -> int {
         let n = 0;
         let c = self.first[idx];
         while c >= 0 {
@@ -83,7 +83,7 @@ impl Store {
         return n;
     }
 
-    fn find_child(int parent, string key) -> int {
+    pub fn find_child(int parent, string key) -> int {
         let c = self.first[parent];
         while c >= 0 {
             if self.keys[c] == key {
@@ -94,7 +94,7 @@ impl Store {
         return -1;
     }
 
-    fn nth_child(int parent, int n) -> int {
+    pub fn nth_child(int parent, int n) -> int {
         let c = self.first[parent];
         let i = 0;
         while c >= 0 {
@@ -121,10 +121,10 @@ class TomlValue {
     store: Store,
     idx: int,
     tag: int,
-    flag: bool,
-    i: int,
-    f: float,
-    s: string,
+    pub flag: bool,
+    pub i: int,
+    pub f: float,
+    pub s: string,
 }
 
 class Parser {
@@ -132,13 +132,13 @@ class Parser {
     i: int,
     line: int,
     col: int,
-    store: Store,
+    pub store: Store,
     root: int,
     current: int,
 }
 
 impl TomlValue {
-    static fn wrap(Store store, int idx) -> TomlValue {
+    pub static fn wrap(Store store, int idx) -> TomlValue {
         return new TomlValue(
             store,
             idx,
@@ -150,19 +150,19 @@ impl TomlValue {
         );
     }
 
-    static fn from_string(string s) -> TomlValue {
+    pub static fn from_string(string s) -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_STR, false, 0, 0.0, s, "");
         return TomlValue::wrap(st, idx);
     }
 
-    static fn from_int(int n) -> TomlValue {
+    pub static fn from_int(int n) -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_INT, false, n, 0.0, "", "");
         return TomlValue::wrap(st, idx);
     }
 
-    static fn from_bool(bool flag) -> TomlValue {
+    pub static fn from_bool(bool flag) -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_BOOL, flag, 0, 0.0, "", "");
         return TomlValue::wrap(st, idx);
@@ -194,49 +194,49 @@ impl TomlValue {
         return TomlValue::wrap(st, idx);
     }
 
-    static fn empty_table() -> TomlValue {
+    pub static fn empty_table() -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_TAB, false, KIND_EXPLICIT, 0.0, "", "");
         return TomlValue::wrap(st, idx);
     }
 
-    fn is_string() -> bool {
+    pub fn is_string() -> bool {
         return self.tag == TAG_STR;
     }
 
-    fn is_int() -> bool {
+    pub fn is_int() -> bool {
         return self.tag == TAG_INT;
     }
 
-    fn is_float() -> bool {
+    pub fn is_float() -> bool {
         return self.tag == TAG_FLOAT;
     }
 
-    fn is_bool() -> bool {
+    pub fn is_bool() -> bool {
         return self.tag == TAG_BOOL;
     }
 
-    fn is_datetime() -> bool {
+    pub fn is_datetime() -> bool {
         return self.tag == TAG_DT;
     }
 
-    fn is_array() -> bool {
+    pub fn is_array() -> bool {
         return self.tag == TAG_ARR;
     }
 
-    fn is_table() -> bool {
+    pub fn is_table() -> bool {
         return self.tag == TAG_TAB;
     }
 
-    fn array_len() -> int {
+    pub fn array_len() -> int {
         return self.store.count_children(self.idx);
     }
 
-    fn table_len() -> int {
+    pub fn table_len() -> int {
         return self.store.count_children(self.idx);
     }
 
-    fn child(int n) -> TomlValue {
+    pub fn child(int n) -> TomlValue {
         let c = self.store.nth_child(self.idx, n);
         if c < 0 {
             return self;
@@ -252,11 +252,11 @@ impl TomlValue {
         return self.store.keys[c];
     }
 
-    fn has(string key) -> bool {
+    pub fn has(string key) -> bool {
         return self.store.find_child(self.idx, key) >= 0;
     }
 
-    fn get(string key) -> TomlValue {
+    pub fn get(string key) -> TomlValue {
         let c = self.store.find_child(self.idx, key);
         if c < 0 {
             return self;
@@ -562,7 +562,7 @@ impl TomlValue {
         return ();
     }
 
-    fn emit(Vec<byte> out) -> Result<(), TomlError> {
+    pub fn emit(Vec<byte> out) -> Result<(), TomlError> {
         if self.store.tags[self.idx] != TAG_TAB {
             return self.emit_value(out, self.idx)?;
         }
@@ -600,6 +600,12 @@ impl Parser {
     }
 
     fn cur() -> byte {
+        if self.i < 0 {
+            return 0 as byte;
+        }
+        if self.i >= len(self.bytes) {
+            return 0 as byte;
+        }
         return self.bytes[self.i];
     }
 
@@ -627,7 +633,10 @@ impl Parser {
     }
 
     fn skip_comment() {
-        if self.at_end() || self.cur() != "#" {
+        if self.at_end() {
+            return;
+        }
+        if self.cur() != "#" {
             return;
         }
         while !self.at_end() {
@@ -1065,7 +1074,10 @@ impl Parser {
 
     fn parse_bare_key() -> Result<string, TomlError> {
         let out: Vec<byte> = Vec::new();
-        if self.at_end() || !self.is_bare_start(self.cur()) {
+        if self.at_end() {
+            raise self.invalid();
+        }
+        if !self.is_bare_start(self.cur()) {
             raise self.invalid();
         }
         while !self.at_end() && self.is_bare_start(self.cur()) {
@@ -1744,7 +1756,8 @@ impl Parser {
             if v == 0 {
                 return self.store.add(TAG_INT, false, 0, 0.0, "", "");
             }
-            return self.store.add(TAG_INT, false, 0 - v, 0.0, "", "");
+            let neg1 = 0 - 1;
+            return self.store.add(TAG_INT, false, v * neg1, 0.0, "", "");
         }
         return self.store.add(TAG_INT, false, v, 0.0, "", "");
     }
@@ -2007,12 +2020,18 @@ impl Parser {
         self.skip_space();
         self.parse_keys(keys)?;
         self.skip_space();
-        if self.at_end() || self.cur() != "]" {
+        if self.at_end() {
+            raise self.invalid();
+        }
+        if self.cur() != "]" {
             raise self.invalid();
         }
         self.bump();
         if aot {
-            if self.at_end() || self.cur() != "]" {
+            if self.at_end() {
+                raise self.invalid();
+            }
+            if self.cur() != "]" {
                 raise self.invalid();
             }
             self.bump();
@@ -2021,7 +2040,7 @@ impl Parser {
         return self.expect_stmt_end()?;
     }
 
-    fn parse_document() -> Result<int, TomlError> {
+    pub fn parse_document() -> Result<int, TomlError> {
         if len(self.bytes) >= 3 {
             if self.bytes[0] == (239 as byte) && self.bytes[1] == (187 as byte) && self.bytes[2] == (191 as byte) {
                 self.i = 3;
@@ -2051,24 +2070,24 @@ class Toml {
 
 impl Toml {
     /// TOML v1.0.0 encode/decode.
-    static fn v1() -> Toml {
+    pub static fn v1() -> Toml {
         return new Toml(1);
     }
 
-    fn encode(TomlValue value) -> Result<Vec<byte>, TomlError> {
+    pub fn encode(TomlValue value) -> Result<Vec<byte>, TomlError> {
         let out: Vec<byte> = Vec::new();
         value.emit(out)?;
         return out;
     }
 
-    fn decode(Vec<byte> bytes) -> Result<TomlValue, TomlError> {
+    pub fn decode(Vec<byte> bytes) -> Result<TomlValue, TomlError> {
         let _ = self.spec;
         let p = new Parser(bytes, 0, 1, 1, Store::new(), -1, -1);
         let root = p.parse_document()?;
         return TomlValue::wrap(p.store, root);
     }
 
-    fn encode_str(TomlValue value) -> Result<string, TomlError> {
+    pub fn encode_str(TomlValue value) -> Result<string, TomlError> {
         let bytes = self.encode(value)?;
         return match from_bytes(bytes) {
             Result::Ok(s) => s,
@@ -2076,7 +2095,7 @@ impl Toml {
         };
     }
 
-    fn decode_str(string s) -> Result<TomlValue, TomlError> {
+    pub fn decode_str(string s) -> Result<TomlValue, TomlError> {
         return self.decode(to_bytes(s))?;
     }
 }
