@@ -97,7 +97,7 @@ match t.decode_str("a = 1\na = 2\n") {
     Result::Ok(_) => false,
     Result::Err(e) => match e {
         TomlError::Invalid { line, column } => line >= 1 && column >= 1,
-        _ => false,
+        default => false,
     },
 }
 ```
