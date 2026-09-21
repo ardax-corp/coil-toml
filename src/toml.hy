@@ -10,3 +10,26 @@ const TAG_BOOL: int = 3;
 const TAG_DT: int = 4;
 const TAG_ARR: int = 5;
 const TAG_TAB: int = 6;
+
+const KIND_IMPLICIT: int = 0;
+const KIND_EXPLICIT: int = 1;
+const KIND_INLINE: int = 2;
+
+const ARR_VAL: int = 0;
+const ARR_AOT: int = 1;
+
+const FLT_FINITE: int = 0;
+const FLT_INF: int = 1;
+const FLT_NAN: int = 2;
+
+class Store {
+    pub tags: Vec<int>,
+    pub flags: Vec<bool>,
+    pub ints: Vec<int>,
+    pub floats: Vec<float>,
+    pub strs: Vec<string>,
+    pub keys: Vec<string>,
+    pub first: Vec<int>,
+    pub last: Vec<int>,
+    pub next: Vec<int>,
+}
