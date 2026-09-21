@@ -263,3 +263,29 @@ impl TomlValue {
         }
         return TomlValue::wrap(self.store, c);
     }
+
+    fn append_str(Vec<byte> out, string s) {
+        let b = to_bytes(s);
+        let i = 0;
+        while i < len(b) {
+            out.push(b[i]);
+            i = i + 1;
+        }
+    }
+
+    fn is_bare_key(string k) -> bool {
+        let b = to_bytes(k);
+        if len(b) == 0 {
+            return false;
+        }
+        let i = 0;
+        while i < len(b) {
+            let c = b[i];
+            let ok = (c >= "A" && c <= "Z") || (c >= "a" && c <= "z") || (c >= "0" && c <= "9") || c == "_" || c == "-";
+            if !ok {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
