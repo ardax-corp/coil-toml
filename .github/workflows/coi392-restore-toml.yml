@@ -1,0 +1,26 @@
+name: restore-toml
+on:
+  push:
+    branches: [cursor/coi-392-toml-mark-public-methods-pub-387d]
+    paths: ['.coi392-restore/**']
+permissions:
+  contents: write
+jobs:
+  concat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Concatenate chunks into src/toml.hy
+        run: |
+          set -euo pipefail
+          cat .coi392-restore/c00.txt .coi392-restore/c01.txt .coi392-restore/c02.txt .coi392-restore/c03.txt .coi392-restore/c04.txt .coi392-restore/c05.txt .coi392-restore/c06.txt .coi392-restore/c07.txt .coi392-restore/c08.txt > src/toml.hy
+          BYTES=$(wc -c < src/toml.hy)
+          echo bytes=$BYTES
+          test "$BYTES" -eq 58152
+          rm -rf .coi392-restore
+          rm -f .github/workflows/coi392-restore-toml.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'fix: restore full toml.hy with public API methods marked pub (COI-392)'
+          git push
