@@ -1,0 +1,204 @@
+                        continue;
+                    }
+                    if c < "0" || c > "9" {
+                        break;
+                    }
+                    let d: int = (c as int) - ("0" as byte as int);
+                    value = value * ten + (d as float);
+                    frac_places = frac_places + 1;
+                    saw = true;
+                    i = i + 1;
+                }
+            }
+        }
+        if !saw {
+            raise TomlError::Number { line: line, column: column };
+        }
+        let pfrac = 0;
+        while pfrac < frac_places {
+            value = value / ten;
+            pfrac = pfrac + 1;
+        }
+        let exponent = 0;
+        let divide_exp = false;
+        if i < end {
+            let c = self.bytes[i];
+            if c == "e" || c == "E" {
+                i = i + 1;
+                if i < end {
+                    if self.bytes[i] == "_" {
+                        raise TomlError::Number { line: line, column: column };
+                    }
+                    if self.bytes[i] == "+" || self.bytes[i] == "-" {
+                        divide_exp = self.bytes[i] == "-";
+                        i = i + 1;
+                    }
+                }
+                let exp_start = i;
+                while i < end {
+                    let d = self.bytes[i];
+                    if d == "_" {
+                        i = i + 1;
+                        continue;
+                    }
+                    if d < "0" || d > "9" {
+                        break;
+                    }
+                    exponent = exponent * 10 + ((d as int) - ("0" as byte as int));
+                    i = i + 1;
+                }
+                if i == exp_start {
+                    raise TomlError::Number { line: line, column: column };
+                }
+            }
+        }
+        if i != end {
+            raise TomlError::Number { line: line, column: column };
+        }
+        let scaled = sign * value;
+        let e = 0;
+        while e < exponent {
+            if divide_exp {
+                scaled = scaled / ten;
+            } else {
+                scaled = scaled * ten;
+            }
+            e = e + 1;
+        }
+        if scaled != scaled {
+            raise TomlError::Number { line: line, column: column };
+        }
+        if scaled != 0.0 {
+            if scaled * 2.0 == scaled {
+                raise TomlError::Number { line: line, column: column };
+            }
+        }
+        return scaled;
+    }
+
+    fn parse_number() -> Result<int, TomlError> {
+        let line = self.line;
+        let col = self.col;
+        let start = self.i;
+        let neg = false;
+        let signed = false;
+        if !self.at_end() {
+            if self.cur() == "+" {
+                signed = true;
+                self.bump();
+            } else {
+                if self.cur() == "-" {
+                    signed = true;
+                    neg = true;
+                    self.bump();
+                }
+            }
+        }
+        if self.starts_with("inf") || self.starts_with("nan") {
+            return self.parse_inf_nan(neg, signed)?;
+        }
+        if self.at_end() {
+            raise TomlError::Invalid { line: line, column: col };
+        }
+        if self.cur() == "0" && self.i + 1 < len(self.bytes) {
+            let n = self.bytes[self.i + 1];
+            if n == "x" || n == "X" || n == "o" || n == "O" || n == "b" || n == "B" {
+                if signed {
+                    raise TomlError::Invalid { line: line, column: col };
+                }
+                self.bump();
+                self.bump();
+                let radix = 16;
+                if n == "o" || n == "O" {
+                    radix = 8;
+                } else {
+                    if n == "b" || n == "B" {
+                        radix = 2;
+                    }
+                }
+                let dig_start = self.i;
+                self.scan_underscored(radix)?;
+                let v = self.parse_int_digits(dig_start, self.i, radix, line, col)?;
+                return self.store.add(TAG_INT, false, v, 0.0, "", "");
+            }
+        }
+        if self.cur() == "0" {
+            self.bump();
+            if !self.at_end() && self.cur() >= "0" && self.cur() <= "9" {
+                raise TomlError::Invalid { line: self.line, column: self.col };
+            }
+        } else {
+            if !self.digit() {
+                raise TomlError::Invalid { line: self.line, column: self.col };
+            }
+            self.scan_underscored(10)?;
+        }
+        let is_float = false;
+        if !self.at_end() && self.cur() == "." {
+            is_float = true;
+            self.bump();
+            if self.at_end() || self.cur() == "_" || !(self.cur() >= "0" && self.cur() <= "9") {
+                raise TomlError::Invalid { line: self.line, column: self.col };
+            }
+            self.scan_underscored(10)?;
+        }
+        if !self.at_end() {
+            if self.cur() == "e" || self.cur() == "E" {
+                is_float = true;
+                self.bump();
+                if !self.at_end() {
+                    if self.cur() == "+" || self.cur() == "-" {
+                        self.bump();
+                    }
+                }
+                if self.at_end() || self.cur() == "_" || !(self.cur() >= "0" && self.cur() <= "9") {
+                    raise TomlError::Invalid { line: self.line, column: self.col };
+                }
+                self.scan_underscored(10)?;
+            }
+        }
+        let end = self.i;
+        if is_float {
+            let f = self.parse_float_slice(start, end, line, col)?;
+            return self.store.add(TAG_FLOAT, false, FLT_FINITE, f, "", "");
+        }
+        let adj = 0;
+        if signed {
+            adj = 1;
+        }
+        let v = self.parse_int_digits(start + adj, end, 10, line, col)?;
+        if neg {
+            if v == 0 {
+                return self.store.add(TAG_INT, false, 0, 0.0, "", "");
+            }
+            return self.store.add(TAG_INT, false, 0 - v, 0.0, "", "");
+        }
+        return self.store.add(TAG_INT, false, v, 0.0, "", "");
+    }
+
+    fn descend_one(int node, string key, bool create) -> Result<int, TomlError> {
+        let child = self.store.find_child(node, key);
+        if child < 0 {
+            if !create {
+                raise self.invalid();
+            }
+            let t = self.store.add(TAG_TAB, false, KIND_IMPLICIT, 0.0, "", key);
+            self.store.attach(node, t);
+            return t;
+        }
+        if self.store.tags[child] == TAG_ARR && self.store.ints[child] == ARR_AOT {
+            let last = self.store.last[child];
+            if last < 0 {
+                raise self.invalid();
+            }
+            return last;
+        }
+        if self.store.tags[child] != TAG_TAB {
+            raise self.invalid();
+        }
+        if self.store.ints[child] == KIND_INLINE {
+            raise self.invalid();
+        }
+        return child;
+    }
+
