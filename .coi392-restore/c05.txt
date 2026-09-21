@@ -1,0 +1,231 @@
+            }
+        }
+        if time_only {
+            let h = first;
+            self.bump();
+            let m = self.take_digits(2)?;
+            if self.at_end() {
+                raise self.invalid();
+            }
+            if self.cur() != ":" {
+                raise self.invalid();
+            }
+            self.bump();
+            let s = self.take_digits(2)?;
+            if h > 23 {
+                raise self.invalid();
+            }
+            if m > 59 {
+                raise self.invalid();
+            }
+            if s > 60 {
+                raise self.invalid();
+            }
+            self.parse_frac()?;
+        } else {
+            let y = first * 100 + self.take_digits(2)?;
+            if self.at_end() {
+                raise self.invalid();
+            }
+            if self.cur() != "-" {
+                raise self.invalid();
+            }
+            self.bump();
+            let mo = self.take_digits(2)?;
+            if self.at_end() {
+                raise self.invalid();
+            }
+            if self.cur() != "-" {
+                raise self.invalid();
+            }
+            self.bump();
+            let d = self.take_digits(2)?;
+            let md = self.month_days(y, mo);
+            if mo < 1 {
+                raise self.invalid();
+            }
+            if md == 0 {
+                raise self.invalid();
+            }
+            if d < 1 {
+                raise self.invalid();
+            }
+            if d > md {
+                raise self.invalid();
+            }
+            if !self.at_end() {
+                let sep = self.cur();
+                let is_sep = false;
+                if sep == "T" {
+                    is_sep = true;
+                }
+                if sep == "t" {
+                    is_sep = true;
+                }
+                if sep == " " {
+                    is_sep = true;
+                }
+                if is_sep {
+                    self.bump();
+                    self.parse_time_hms()?;
+                    self.parse_offset()?;
+                }
+            }
+        }
+        let end = self.i;
+        let slice: Vec<byte> = Vec::new();
+        let j = start;
+        while j < end {
+            slice.push(self.bytes[j]);
+            j = j + 1;
+        }
+        let s = match from_bytes(slice) {
+            Result::Ok(t) => t,
+            Result::Err(_) => raise TomlError::Utf8 { line: line, column: col },
+        };
+        return self.store.add(TAG_DT, false, 0, 0.0, s, "");
+    }
+
+    fn underscore_ok(byte prev, byte next) -> bool {
+        let pd = prev >= "0" && prev <= "9" || (prev >= "a" && prev <= "f") || (prev >= "A" && prev <= "F");
+        let nd = next >= "0" && next <= "9" || (next >= "a" && next <= "f") || (next >= "A" && next <= "F");
+        return pd && nd;
+    }
+
+    fn parse_int_digits(int start, int end, int radix, int line, int column) -> Result<int, TomlError> {
+        let value = 0;
+        let j = start;
+        let saw = false;
+        while j < end {
+            if self.bytes[j] == "_" {
+                j = j + 1;
+                continue;
+            }
+            let d = -1;
+            if radix == 10 {
+                d = self.byte_digit(self.bytes[j]);
+            } else {
+                if radix == 16 {
+                    d = self.hex_val(self.bytes[j]);
+                } else {
+                    if radix == 8 {
+                        d = self.byte_digit(self.bytes[j]);
+                        if d > 7 {
+                            d = -1;
+                        }
+                    } else {
+                        d = self.byte_digit(self.bytes[j]);
+                        if d > 1 {
+                            d = -1;
+                        }
+                    }
+                }
+            }
+            if d < 0 {
+                raise TomlError::Number { line: line, column: column };
+            }
+            let next = value * radix + d;
+            if value > 0 {
+                if next < value {
+                    raise TomlError::Number { line: line, column: column };
+                }
+            }
+            value = next;
+            saw = true;
+            j = j + 1;
+        }
+        if !saw {
+            raise TomlError::Number { line: line, column: column };
+        }
+        return value;
+    }
+
+    fn scan_underscored(int radix) -> Result<(), TomlError> {
+        let start = self.i;
+        if self.at_end() {
+            raise self.number_err();
+        }
+        let prev: byte = "_";
+        let saw = false;
+        while !self.at_end() {
+            let c = self.cur();
+            let d = false;
+            if radix == 10 {
+                d = c >= "0" && c <= "9";
+            } else {
+                if radix == 16 {
+                    d = self.hex_val(c) >= 0;
+                } else {
+                    if radix == 8 {
+                        d = c >= "0" && c <= "7";
+                    } else {
+                        d = c == "0" || c == "1";
+                    }
+                }
+            }
+            if d {
+                prev = c;
+                saw = true;
+                self.bump();
+                continue;
+            }
+            if c == "_" {
+                if self.i + 1 >= len(self.bytes) {
+                    raise self.number_err();
+                }
+                let nxt = self.bytes[self.i + 1];
+                if !self.underscore_ok(prev, nxt) {
+                    raise self.number_err();
+                }
+                if radix == 10 {
+                    if !(prev >= "0" && prev <= "9") {
+                        raise self.number_err();
+                    }
+                }
+                self.bump();
+                continue;
+            }
+            break;
+        }
+        if !saw || start == self.i {
+            raise self.number_err();
+        }
+        return ();
+    }
+
+    fn parse_float_slice(int start, int end, int line, int column) -> Result<float, TomlError> {
+        let ten: float = 10.0;
+        let i = start;
+        let sign = 1.0;
+        if i < end {
+            if self.bytes[i] == "+" || self.bytes[i] == "-" {
+                if self.bytes[i] == "-" {
+                    sign = 0.0 - 1.0;
+                }
+                i = i + 1;
+            }
+        }
+        let value = 0.0;
+        let saw = false;
+        while i < end {
+            let c = self.bytes[i];
+            if c == "_" {
+                i = i + 1;
+                continue;
+            }
+            if c < "0" || c > "9" {
+                break;
+            }
+            let d: int = (c as int) - ("0" as byte as int);
+            value = value * ten + (d as float);
+            saw = true;
+            i = i + 1;
+        }
+        let frac_places = 0;
+        if i < end {
+            if self.bytes[i] == "." {
+                i = i + 1;
+                while i < end {
+                    let c = self.bytes[i];
+                    if c == "_" {
+                        i = i + 1;
