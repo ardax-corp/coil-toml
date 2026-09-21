@@ -33,3 +33,77 @@ class Store {
     pub last: Vec<int>,
     pub next: Vec<int>,
 }
+
+impl Store {
+    pub static fn new() -> Store {
+        return new Store(
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        );
+    }
+
+    pub fn add(int tag, bool flag, int n, float x, string s, string key) -> int {
+        let idx = len(self.tags);
+        self.tags.push(tag);
+        self.flags.push(flag);
+        self.ints.push(n);
+        self.floats.push(x);
+        self.strs.push(s);
+        self.keys.push(key);
+        self.first.push(-1);
+        self.last.push(-1);
+        self.next.push(-1);
+        return idx;
+    }
+
+    pub fn attach(int parent, int child) {
+        if self.first[parent] < 0 {
+            self.first[parent] = child;
+            self.last[parent] = child;
+        } else {
+            self.next[self.last[parent]] = child;
+            self.last[parent] = child;
+        }
+    }
+
+    pub fn count_children(int idx) -> int {
+        let n = 0;
+        let c = self.first[idx];
+        while c >= 0 {
+            n = n + 1;
+            c = self.next[c];
+        }
+        return n;
+    }
+
+    pub fn find_child(int parent, string key) -> int {
+        let c = self.first[parent];
+        while c >= 0 {
+            if self.keys[c] == key {
+                return c;
+            }
+            c = self.next[c];
+        }
+        return -1;
+    }
+
+    pub fn nth_child(int parent, int n) -> int {
+        let c = self.first[parent];
+        let i = 0;
+        while c >= 0 {
+            if i == n {
+                return c;
+            }
+            i = i + 1;
+            c = self.next[c];
+        }
+        return -1;
+    }
+}
