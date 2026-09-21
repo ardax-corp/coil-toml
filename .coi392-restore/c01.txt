@@ -1,0 +1,233 @@
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+
+    fn append_basic_string(Vec<byte> out, string s) {
+        out.push("\"" as byte);
+        let b = to_bytes(s);
+        let i = 0;
+        let sixteen: int = 16;
+        let ht: int = 9;
+        let lf: int = 10;
+        let ff: int = 12;
+        let cr: int = 13;
+        let bs: int = 8;
+        let sp: int = 32;
+        let ten: int = 10;
+        while i < len(b) {
+            let c: int = b[i] as int;
+            if c == ("\"" as byte as int) {
+                out.push("\\" as byte);
+                out.push("\"" as byte);
+            } else if c == ("\\" as byte as int) {
+                out.push("\\" as byte);
+                out.push("\\" as byte);
+            } else if c == bs {
+                out.push("\\" as byte);
+                out.push("b" as byte);
+            } else if c == ff {
+                out.push("\\" as byte);
+                out.push("f" as byte);
+            } else if c == lf {
+                out.push("\\" as byte);
+                out.push("n" as byte);
+            } else if c == cr {
+                out.push("\\" as byte);
+                out.push("r" as byte);
+            } else if c == ht {
+                out.push("\\" as byte);
+                out.push("t" as byte);
+            } else if c < sp {
+                let hi = c / sixteen;
+                let lo = c % sixteen;
+                out.push("\\" as byte);
+                out.push("u" as byte);
+                out.push("0" as byte);
+                out.push("0" as byte);
+                if hi < ten {
+                    out.push((("0" as byte as int) + hi) as byte);
+                } else {
+                    out.push((("a" as byte as int) + (hi - ten)) as byte);
+                }
+                if lo < ten {
+                    out.push((("0" as byte as int) + lo) as byte);
+                } else {
+                    out.push((("a" as byte as int) + (lo - ten)) as byte);
+                }
+            } else {
+                out.push(c as byte);
+            }
+            i = i + 1;
+        }
+        out.push("\"" as byte);
+    }
+
+    fn append_key(Vec<byte> out, string k) {
+        if self.is_bare_key(k) {
+            self.append_str(out, k);
+        } else {
+            self.append_basic_string(out, k);
+        }
+    }
+
+    fn append_float(Vec<byte> out, int idx) -> Result<(), TomlError> {
+        let kind = self.store.ints[idx];
+        let neg = self.store.flags[idx];
+        if kind == FLT_NAN {
+            if neg {
+                self.append_str(out, "-nan");
+            } else {
+                self.append_str(out, "nan");
+            }
+            return ();
+        }
+        if kind == FLT_INF {
+            if neg {
+                self.append_str(out, "-inf");
+            } else {
+                self.append_str(out, "inf");
+            }
+            return ();
+        }
+        let x = self.store.floats[idx];
+        if x != x {
+            raise TomlError::Number { line: 1, column: 1 };
+        }
+        if x != 0.0 {
+            if x * 2.0 == x {
+                raise TomlError::Number { line: 1, column: 1 };
+            }
+        }
+        let s = format("%f", x);
+        let b = to_bytes(s);
+        let n = len(b);
+        if n == 0 {
+            raise TomlError::Number { line: 1, column: 1 };
+        }
+        let i = 0;
+        let has_dot = false;
+        let has_exp = false;
+        while i < n {
+            let c = b[i];
+            if c == "." {
+                has_dot = true;
+            } else {
+                if c == "e" || c == "E" {
+                    has_exp = true;
+                }
+            }
+            out.push(c);
+            i = i + 1;
+        }
+        if !has_dot && !has_exp {
+            out.push("." as byte);
+            out.push("0" as byte);
+        }
+        return ();
+    }
+
+    #[max_depth(256)]
+    fn emit_value(Vec<byte> out, int idx) -> Result<(), TomlError> {
+        let tag = self.store.tags[idx];
+        if tag == TAG_STR {
+            self.append_basic_string(out, self.store.strs[idx]);
+            return ();
+        }
+        if tag == TAG_INT {
+            self.append_str(out, format("%i", self.store.ints[idx]));
+            return ();
+        }
+        if tag == TAG_FLOAT {
+            return self.append_float(out, idx)?;
+        }
+        if tag == TAG_BOOL {
+            if self.store.flags[idx] {
+                self.append_str(out, "true");
+            } else {
+                self.append_str(out, "false");
+            }
+            return ();
+        }
+        if tag == TAG_DT {
+            self.append_str(out, self.store.strs[idx]);
+            return ();
+        }
+        if tag == TAG_ARR {
+            out.push("[" as byte);
+            let c = self.store.first[idx];
+            let first = true;
+            while c >= 0 {
+                if !first {
+                    self.append_str(out, ", ");
+                }
+                first = false;
+                self.emit_value(out, c)?;
+                c = self.store.next[c];
+            }
+            out.push("]" as byte);
+            return ();
+        }
+        if tag == TAG_TAB {
+            self.append_str(out, "{ ");
+            let c = self.store.first[idx];
+            let first = true;
+            while c >= 0 {
+                if !first {
+                    self.append_str(out, ", ");
+                }
+                first = false;
+                self.append_key(out, self.store.keys[c]);
+                self.append_str(out, " = ");
+                self.emit_value(out, c)?;
+                c = self.store.next[c];
+            }
+            if first {
+                self.append_str(out, "}");
+            } else {
+                self.append_str(out, " }");
+            }
+            return ();
+        }
+        raise TomlError::Invalid { line: 1, column: 1 };
+    }
+
+    fn is_aot(int idx) -> bool {
+        return self.store.tags[idx] == TAG_ARR && self.store.ints[idx] == ARR_AOT;
+    }
+
+    fn is_inline_table(int idx) -> bool {
+        return self.store.tags[idx] == TAG_TAB && self.store.ints[idx] == KIND_INLINE;
+    }
+
+    fn is_nested_table(int idx) -> bool {
+        if self.store.tags[idx] != TAG_TAB {
+            return false;
+        }
+        return self.store.ints[idx] != KIND_INLINE;
+    }
+
+    fn emit_header(Vec<byte> out, string path, bool aot) {
+        if aot {
+            self.append_str(out, "[[");
+            self.append_str(out, path);
+            self.append_str(out, "]]\n");
+        } else {
+            out.push("[" as byte);
+            self.append_str(out, path);
+            self.append_str(out, "]\n");
+        }
+    }
+
+    fn path_join(string parent, string key) -> string {
+        let kb: Vec<byte> = Vec::new();
+        self.append_key(kb, key);
+        let ks = match from_bytes(kb) {
+            Result::Ok(s) => s,
+            Result::Err(_) => key,
+        };
+        if parent == "" {
+            return ks;
+        }
