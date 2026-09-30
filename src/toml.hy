@@ -30,7 +30,7 @@ class Store {
     pub strs: Vec<string>,
     pub keys: Vec<string>,
     pub first: Vec<int>,
-    pub last: Vec<int>,
+    last: Vec<int>,
     pub next: Vec<int>,
 }
 
@@ -106,6 +106,10 @@ impl Store {
         }
         return -1;
     }
+
+    pub fn last_child(int idx) -> int {
+        return self.last[idx];
+    }
 }
 
 /// Decode/encode failure. `line` and `column` are 1-based (column counts bytes in the line).
@@ -168,13 +172,13 @@ impl TomlValue {
         return TomlValue::wrap(st, idx);
     }
 
-    static fn from_datetime(string s) -> TomlValue {
+    pub static fn from_datetime(string s) -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_DT, false, 0, 0.0, s, "");
         return TomlValue::wrap(st, idx);
     }
 
-    static fn from_float(float x) -> TomlValue {
+    pub static fn from_float(float x) -> TomlValue {
         let st = Store::new();
         let kind = FLT_FINITE;
         let neg = false;
@@ -244,7 +248,7 @@ impl TomlValue {
         return TomlValue::wrap(self.store, c);
     }
 
-    fn key_at(int n) -> string {
+    pub fn key_at(int n) -> string {
         let c = self.store.nth_child(self.idx, n);
         if c < 0 {
             return "";
@@ -1773,7 +1777,7 @@ impl Parser {
             return t;
         }
         if self.store.tags[child] == TAG_ARR && self.store.ints[child] == ARR_AOT {
-            let last = self.store.last[child];
+            let last = self.store.last_child(child);
             if last < 0 {
                 raise self.invalid();
             }

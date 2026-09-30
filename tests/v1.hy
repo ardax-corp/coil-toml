@@ -189,6 +189,16 @@ test("encode constructors") {
     assert(must_encode(TomlValue::from_bool(true)) == "true")?;
     assert(must_encode(TomlValue::from_string("hi")) == "\"hi\"")?;
     assert(must_encode(TomlValue::empty_table()) == "")?;
+    let x = TomlValue::from_float(1.5);
+    assert(x.is_float() && x.f > 1.4 && x.f < 1.6, "from_float")?;
+    let d = TomlValue::from_datetime("1979-05-27T07:32:00Z");
+    assert(d.is_datetime() && d.s == "1979-05-27T07:32:00Z", "from_datetime")?;
+}
+
+test("key_at") {
+    let v = must_decode("b = 1\na = 2\n");
+    assert(v.key_at(0) == "b" && v.key_at(1) == "a", "order")?;
+    assert(v.key_at(2) == "", "oob")?;
 }
 
 test("round-trip nested") {
