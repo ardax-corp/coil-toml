@@ -10,7 +10,7 @@ fn is_invalid(Result<TomlValue, TomlError> r) -> bool {
         Result::Ok(_) => false,
         Result::Err(e) => match e {
             TomlError::Invalid { line, column } => line >= 1 && column >= 1,
-            _ => false,
+            default => false,
         },
     };
 }
@@ -80,7 +80,7 @@ test("invalid on second line") {
         Result::Ok(_) => false,
         Result::Err(e) => match e {
             TomlError::Invalid { line, column } => line == 2 && column >= 1,
-            _ => false,
+            default => false,
         },
     }, "line 2")?;
 }
@@ -98,7 +98,7 @@ test("lone surrogate unicode") {
         Result::Ok(_) => false,
         Result::Err(e) => match e {
             TomlError::Utf8 { line, column } => line >= 1 && column >= 1,
-            _ => false,
+            default => false,
         },
     }, "Utf8")?;
 }
@@ -108,7 +108,7 @@ test("bad underscore") {
         Result::Ok(_) => false,
         Result::Err(e) => match e {
             TomlError::Number { line, column } => line >= 1 && column >= 1,
-            _ => false,
+            default => false,
         },
     }, "1_")?;
 }

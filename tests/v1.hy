@@ -26,7 +26,7 @@ fn is_invalid(Result<TomlValue, TomlError> r) -> bool {
         Result::Ok(_) => false,
         Result::Err(e) => match e {
             TomlError::Invalid { line, column } => line >= 1 && column >= 1,
-            _ => false,
+            default => false,
         },
     };
 }
@@ -36,7 +36,7 @@ fn is_number(Result<TomlValue, TomlError> r) -> bool {
         Result::Ok(_) => false,
         Result::Err(e) => match e {
             TomlError::Number { line, column } => line >= 1 && column >= 1,
-            _ => false,
+            default => false,
         },
     };
 }
