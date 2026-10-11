@@ -31,18 +31,15 @@ Covered syntax: comments, bare/quoted/dotted keys, basic and literal strings (in
 | Path | Role |
 |------|------|
 | `src/toml.hy` | `Toml`, `TomlValue`, `TomlError`, parser/stringify |
-| `coil.toml` | `[package] name = "toml"` so `use toml::{…}` resolves |
+| `coil.toml` | spool manifest (`[package] name = "toml"`); coil does not read it |
 
 ## Consume
 
-Sibling checkout, or a git dep plus `coil.lock` pin. Call `Toml::v1()` from [docs/consume.md](docs/consume.md).
-
-```toml
-[dependencies]
-toml = { git = "https://github.com/ardax-corp/coil-toml.git" }
+```bash
+spool add toml --git https://github.com/ardax-corp/coil-toml.git --rev <commit SHA>
 ```
 
-`{ git }` is the parseable form. `version` is optional schema, not a tag. The pin is `coil.lock` `rev` + `content_hash`.
+No tags yet, so pin a commit. Without spool, pass `--root ../coil-toml/src` to `coil`. See [docs/consume.md](docs/consume.md).
 
 ## Test
 
