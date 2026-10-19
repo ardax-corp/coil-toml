@@ -50,7 +50,7 @@ impl Store {
     }
 
     pub fn add(int tag, bool flag, int n, float x, string s, string key) -> int {
-        let idx = len(self.tags);
+        let idx = self.tags.len();
         self.tags.push(tag);
         self.flags.push(flag);
         self.ints.push(n);
@@ -271,7 +271,7 @@ impl TomlValue {
     fn append_str(Vec<byte> out, string s) {
         let b = to_bytes(s);
         let i = 0;
-        while i < len(b) {
+        while i < b.len() {
             out.push(b[i]);
             i = i + 1;
         }
@@ -279,11 +279,11 @@ impl TomlValue {
 
     fn is_bare_key(string k) -> bool {
         let b = to_bytes(k);
-        if len(b) == 0 {
+        if b.len() == 0 {
             return false;
         }
         let i = 0;
-        while i < len(b) {
+        while i < b.len() {
             let c = b[i];
             let ok = (c >= "A" && c <= "Z") || (c >= "a" && c <= "z") || (c >= "0" && c <= "9") || c == "_" || c == "-";
             if !ok {
@@ -306,7 +306,7 @@ impl TomlValue {
         let bs: int = 8;
         let sp: int = 32;
         let ten: int = 10;
-        while i < len(b) {
+        while i < b.len() {
             let c: int = b[i] as int;
             if c == ("\"" as byte as int) {
                 out.push("\\" as byte);
@@ -392,7 +392,7 @@ impl TomlValue {
         }
         let s = format("%f", x);
         let b = to_bytes(s);
-        let n = len(b);
+        let n = b.len();
         if n == 0 {
             raise TomlError::Number { line: 1, column: 1 };
         }
@@ -526,8 +526,8 @@ impl TomlValue {
     #[max_depth(256)]
     fn emit_table(Vec<byte> out, int idx, string path, bool emit_hdr, bool aot_elem) -> Result<(), TomlError> {
         if emit_hdr {
-            if len(out) > 0 {
-                let last = out[len(out) - 1];
+            if out.len() > 0 {
+                let last = out[out.len() - 1];
                 if last != "\n" {
                     out.push("\n" as byte);
                 }
@@ -576,11 +576,11 @@ impl TomlValue {
 
 impl Parser {
     fn at_end() -> bool {
-        return self.i >= len(self.bytes);
+        return self.i >= self.bytes.len();
     }
 
     fn bump() {
-        if self.i >= len(self.bytes) {
+        if self.i >= self.bytes.len() {
             return;
         }
         let c = self.bytes[self.i];
@@ -588,7 +588,7 @@ impl Parser {
         if c == "\r" {
             self.line = self.line + 1;
             self.col = 1;
-            if self.i < len(self.bytes) {
+            if self.i < self.bytes.len() {
                 if self.bytes[self.i] == "\n" {
                     self.i = self.i + 1;
                 }
@@ -607,7 +607,7 @@ impl Parser {
         if self.i < 0 {
             return 0 as byte;
         }
-        if self.i >= len(self.bytes) {
+        if self.i >= self.bytes.len() {
             return 0 as byte;
         }
         return self.bytes[self.i];
@@ -925,7 +925,7 @@ impl Parser {
     fn count_quote(byte q) -> int {
         let n = 0;
         let j = self.i;
-        while j < len(self.bytes) {
+        while j < self.bytes.len() {
             if self.bytes[j] != q {
                 break;
             }
@@ -1122,8 +1122,8 @@ impl Parser {
     fn starts_with(string lit) -> bool {
         let b = to_bytes(lit);
         let k = 0;
-        while k < len(b) {
-            if self.i + k >= len(self.bytes) {
+        while k < b.len() {
+            if self.i + k >= self.bytes.len() {
                 return false;
             }
             if self.bytes[self.i + k] != b[k] {
@@ -1137,7 +1137,7 @@ impl Parser {
     fn eat(string lit) -> Result<(), TomlError> {
         let b = to_bytes(lit);
         let k = 0;
-        while k < len(b) {
+        while k < b.len() {
             if self.at_end() || self.cur() != b[k] {
                 raise self.invalid();
             }
@@ -1528,7 +1528,7 @@ impl Parser {
                 continue;
             }
             if c == "_" {
-                if self.i + 1 >= len(self.bytes) {
+                if self.i + 1 >= self.bytes.len() {
                     raise self.number_err();
                 }
                 let nxt = self.bytes[self.i + 1];
@@ -1689,7 +1689,7 @@ impl Parser {
         if self.at_end() {
             raise TomlError::Invalid { line: line, column: col };
         }
-        if self.cur() == "0" && self.i + 1 < len(self.bytes) {
+        if self.cur() == "0" && self.i + 1 < self.bytes.len() {
             let n = self.bytes[self.i + 1];
             if n == "x" || n == "X" || n == "o" || n == "O" || n == "b" || n == "B" {
                 if signed {
@@ -1803,7 +1803,7 @@ impl Parser {
     }
 
     fn define_table(Vec<string> keys, bool aot) -> Result<int, TomlError> {
-        let n = len(keys);
+        let n = keys.len();
         if n == 0 {
             raise self.invalid();
         }
@@ -1844,7 +1844,7 @@ impl Parser {
     }
 
     fn insert_keyval(int from, Vec<string> keys, int val) -> Result<(), TomlError> {
-        let n = len(keys);
+        let n = keys.len();
         if n == 0 {
             raise self.invalid();
         }
@@ -1898,7 +1898,7 @@ impl Parser {
             let dt = false;
             let jd = self.i + 4;
             let jd2 = self.i + 7;
-            if jd2 < len(self.bytes) {
+            if jd2 < self.bytes.len() {
                 if self.bytes[jd] == "-" {
                     if self.bytes[jd2] == "-" {
                         dt = true;
@@ -1907,7 +1907,7 @@ impl Parser {
             }
             let jc = self.i + 2;
             let jc2 = self.i + 5;
-            if jc2 < len(self.bytes) {
+            if jc2 < self.bytes.len() {
                 if self.bytes[jc] == ":" {
                     if self.bytes[jc2] == ":" {
                         dt = true;
@@ -2045,7 +2045,7 @@ impl Parser {
     }
 
     pub fn parse_document() -> Result<int, TomlError> {
-        if len(self.bytes) >= 3 {
+        if self.bytes.len() >= 3 {
             if self.bytes[0] == (239 as byte) && self.bytes[1] == (187 as byte) && self.bytes[2] == (191 as byte) {
                 self.i = 3;
             }
