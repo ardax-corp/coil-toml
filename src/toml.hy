@@ -115,7 +115,6 @@ impl Store {
 /// Decode/encode failure. `line` and `column` are 1-based (column counts bytes in the line).
 enum TomlError {
     Invalid { line: int, column: int },
-    Io { line: int, column: int },
     Utf8 { line: int, column: int },
     Number { line: int, column: int },
 }

@@ -14,7 +14,7 @@ let v = t.decode_str("a = 1\n\n[b]\nc = true\n")?;
 let bytes = t.encode(v)?;
 ```
 
-`Toml::v1()` is TOML 1.0.0. Invalid input returns `TomlError` with 1-based line/column (`Invalid`, `Io`, `Utf8`, `Number`), not panic.
+`Toml::v1()` is TOML 1.0.0. Invalid input returns `TomlError` with 1-based line/column (`Invalid`, `Utf8`, `Number`), not panic.
 
 | Method | Role |
 |--------|------|
