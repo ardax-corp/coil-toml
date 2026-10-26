@@ -64,7 +64,6 @@ A number token with no `.` / `e` / `E` / `inf` / `nan` that fits in i64 is an in
 ```coil
 enum TomlError {
     Invalid { line: int, column: int },
-    Io { line: int, column: int },
     Utf8 { line: int, column: int },
     Number { line: int, column: int },
 }
