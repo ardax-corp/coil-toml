@@ -1160,7 +1160,7 @@ impl Parser {
             if self.ident_cont() {
                 raise self.invalid();
             }
-            let x = exp(1000.0);
+            let x = 1.0 / 0.0;
             if neg {
                 x = 0.0 - x;
             }
@@ -1171,7 +1171,7 @@ impl Parser {
             if self.ident_cont() {
                 raise self.invalid();
             }
-            let x = sqrt(0.0 - 1.0);
+            let x = 0.0 / 0.0;
             return self.store.add(TAG_FLOAT, neg, FLT_NAN, x, "", "");
         }
         raise self.invalid();
