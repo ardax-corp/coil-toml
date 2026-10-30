@@ -32,6 +32,11 @@ class Store {
     pub first: Vec<int>,
     last: Vec<int>,
     pub next: Vec<int>,
+    // Child -> parent, and an open-addressing index of (parent, key) -> child
+    // (-1 = empty slot) so `find_child` is O(1) instead of a list walk.
+    parent: Vec<int>,
+    slots: Vec<int>,
+    used: int,
 }
 
 impl Store {
@@ -46,6 +51,9 @@ impl Store {
             Vec::new(),
             Vec::new(),
             Vec::new(),
+            Vec::new(),
+            Store::empty_slots(16),
+            0,
         );
     }
 
@@ -60,10 +68,67 @@ impl Store {
         self.first.push(-1);
         self.last.push(-1);
         self.next.push(-1);
+        self.parent.push(-1);
         return idx;
     }
 
+    static fn empty_slots(int cap) -> Vec<int> {
+        let v: Vec<int> = Vec::new();
+        let i = 0;
+        while i < cap {
+            v.push(-1);
+            i = i + 1;
+        }
+        return v;
+    }
+
+    fn slot_of(int parent, string key) -> int {
+        let h = key.hash() ^ (parent * 40503);
+        return h & (self.slots.len() - 1);
+    }
+
+    // Records `child` under (parent, key) unless an earlier child holds that
+    // pair: `find_child` returns the first match, as the list walk did.
+    fn index_child(int child) {
+        if (self.used + 1) * 2 > self.slots.len() {
+            self.grow_slots();
+        }
+        let p = self.parent[child];
+        let key = self.keys[child];
+        let mask = self.slots.len() - 1;
+        let s = self.slot_of(p, key);
+        while self.slots[s] >= 0 {
+            let c = self.slots[s];
+            if self.parent[c] == p && self.keys[c] == key {
+                return;
+            }
+            s = (s + 1) & mask;
+        }
+        self.slots[s] = child;
+        self.used = self.used + 1;
+    }
+
+    fn grow_slots() {
+        let old = self.slots;
+        self.slots = Store::empty_slots(old.len() * 2);
+        let mask = self.slots.len() - 1;
+        let i = 0;
+        while i < old.len() {
+            let c = old[i];
+            if c >= 0 {
+                let s = self.slot_of(self.parent[c], self.keys[c]);
+                while self.slots[s] >= 0 {
+                    s = (s + 1) & mask;
+                }
+                self.slots[s] = c;
+            }
+            i = i + 1;
+        }
+    }
+
     pub fn attach(int parent, int child) {
+        self.parent[child] = parent;
+        self.index_child(child);
         if self.first[parent] < 0 {
             self.first[parent] = child;
             self.last[parent] = child;
@@ -84,12 +149,14 @@ impl Store {
     }
 
     pub fn find_child(int parent, string key) -> int {
-        let c = self.first[parent];
-        while c >= 0 {
-            if self.keys[c] == key {
+        let mask = self.slots.len() - 1;
+        let s = self.slot_of(parent, key);
+        while self.slots[s] >= 0 {
+            let c = self.slots[s];
+            if self.parent[c] == parent && self.keys[c] == key {
                 return c;
             }
-            c = self.next[c];
+            s = (s + 1) & mask;
         }
         return -1;
     }
