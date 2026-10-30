@@ -602,6 +602,50 @@ impl Parser {
         }
     }
 
+    // Moves the cursor to `j` over bytes that hold no line break, keeping
+    // `col` as a `bump` per byte would.
+    fn advance_cols(int j) {
+        self.col = self.col + (j - self.i);
+        self.i = j;
+    }
+
+    // The end of the run from the cursor of bytes a string body copies as
+    // they are: not `stop`, `\\` (when `escapes`), or a control byte other
+    // than tab (line breaks included).
+    fn plain_run_end(byte stop, bool escapes) -> int {
+        let b = self.bytes;
+        let i = self.i;
+        if escapes {
+            while i < b.len() {
+                let c = b[i];
+                if c == stop || c == "\\" || (c < " " && c != "\t") {
+                    break;
+                }
+                i = i + 1;
+            }
+        } else {
+            while i < b.len() {
+                let c = b[i];
+                if c == stop || (c < " " && c != "\t") {
+                    break;
+                }
+                i = i + 1;
+            }
+        }
+        return i;
+    }
+
+    // Appends the cursor's run up to `j` to `out` and moves past it.
+    fn take_run(Vec<byte> out, int j) {
+        let b = self.bytes;
+        let k = self.i;
+        while k < j {
+            out.push(b[k]);
+            k = k + 1;
+        }
+        self.advance_cols(j);
+    }
+
     fn cur() -> byte {
         if self.i < 0 {
             return 0 as byte;
@@ -625,14 +669,16 @@ impl Parser {
     }
 
     fn skip_space() {
-        while !self.at_end() {
-            let c = self.cur();
-            if c == " " || c == "\t" {
-                self.bump();
-            } else {
+        let b = self.bytes;
+        let i = self.i;
+        while i < b.len() {
+            let c = b[i];
+            if c != " " && c != "\t" {
                 break;
             }
+            i = i + 1;
         }
+        self.advance_cols(i);
     }
 
     fn skip_comment() {
@@ -642,20 +688,23 @@ impl Parser {
         if self.cur() != "#" {
             return;
         }
-        while !self.at_end() {
-            let c = self.cur();
+        let b = self.bytes;
+        let i = self.i;
+        while i < b.len() {
+            let c = b[i];
             if c == "\n" || c == "\r" {
                 break;
             }
-            self.bump();
+            i = i + 1;
         }
+        self.advance_cols(i);
     }
 
     fn skip_trivia() {
         while !self.at_end() {
             let c = self.cur();
             if c == " " || c == "\t" {
-                self.bump();
+                self.skip_space();
                 continue;
             }
             if c == "#" {
@@ -872,6 +921,7 @@ impl Parser {
         self.bump();
         let out: Vec<byte> = Vec::new();
         while true {
+            self.take_run(out, self.plain_run_end("\"", true));
             if self.at_end() {
                 raise self.invalid();
             }
@@ -901,6 +951,7 @@ impl Parser {
         self.bump();
         let out: Vec<byte> = Vec::new();
         while true {
+            self.take_run(out, self.plain_run_end("'", false));
             if self.at_end() {
                 raise self.invalid();
             }
@@ -952,6 +1003,7 @@ impl Parser {
         let out: Vec<byte> = Vec::new();
         let q: byte = "'";
         while true {
+            self.take_run(out, self.plain_run_end(q, false));
             if self.at_end() {
                 raise self.invalid();
             }
@@ -991,6 +1043,7 @@ impl Parser {
         let out: Vec<byte> = Vec::new();
         let q: byte = "\"";
         while true {
+            self.take_run(out, self.plain_run_end(q, true));
             if self.at_end() {
                 raise self.invalid();
             }
@@ -1083,10 +1136,15 @@ impl Parser {
         if !self.is_bare_start(self.cur()) {
             raise self.invalid();
         }
-        while !self.at_end() && self.is_bare_start(self.cur()) {
-            out.push(self.cur());
-            self.bump();
+        let b = self.bytes;
+        let i = self.i;
+        while i < b.len() {
+            if !self.is_bare_start(b[i]) {
+                break;
+            }
+            i = i + 1;
         }
+        self.take_run(out, i);
         return self.bytes_to_str(out)?;
     }
 
