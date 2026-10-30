@@ -243,3 +243,39 @@ test("long string runs around escapes") {
     assert!(v.get("s").s == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN\tabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN", "basic");
     assert!(v.get("p").s == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN\\abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN", "literal");
 }
+
+// Wide tables: every key is looked up on insert (duplicate check), so these
+// cover the per-table key index (coil-toml#15).
+fn wide_table(int n, string prefix) -> string {
+    let s = "";
+    let i = 0;
+    while i < n {
+        s = s + prefix + i.show() + " = " + i.show() + "\n";
+        i = i + 1;
+    }
+    return s;
+}
+
+test("wide table keeps every key and its order") {
+    let v = must_decode(wide_table(3000, "k"));
+    assert!(v.table_len() == 3000, "len");
+    assert!(v.get("k0").i == 0, "first");
+    assert!(v.get("k1234").i == 1234, "middle");
+    assert!(v.get("k2999").i == 2999, "last");
+    assert!(!v.has("k3000"), "absent");
+    assert!(v.key_at(2500) == "k2500", "order");
+}
+
+test("duplicate key in a wide table is invalid") {
+    let src = wide_table(2000, "k") + "k1999 = 5\n";
+    assert!(is_invalid(codec().decode_str(src)), "dup");
+}
+
+test("same key under different wide tables") {
+    let src = "[a]\n" + wide_table(500, "x") + "[b]\n" + wide_table(500, "x") + "[a.c]\nx1 = 7\n";
+    let v = must_decode(src);
+    assert!(v.get("a").table_len() == 501, "a len");
+    assert!(v.get("b").get("x499").i == 499, "b last");
+    assert!(v.get("a").get("c").get("x1").i == 7, "nested");
+    assert!(is_invalid(codec().decode_str(src + "[b]\n")), "redefine b");
+}
