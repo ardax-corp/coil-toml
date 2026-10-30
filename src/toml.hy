@@ -609,10 +609,10 @@ impl Parser {
         self.i = j;
     }
 
-    // The end of the run from the cursor of bytes a string body copies as
-    // they are: not `stop`, `\\` (when `escapes`), or a control byte other
-    // than tab (line breaks included).
-    fn plain_run_end(byte stop, bool escapes) -> int {
+    // Appends the run from the cursor of bytes a string body copies as
+    // they are to `out` and moves past it: up to `stop`, `\\` (when
+    // `escapes`), or a control byte other than tab (line breaks included).
+    fn copy_run(Vec<byte> out, byte stop, bool escapes) {
         let b = self.bytes;
         let i = self.i;
         if escapes {
@@ -621,6 +621,7 @@ impl Parser {
                 if c == stop || c == "\\" || (c < " " && c != "\t") {
                     break;
                 }
+                out.push(c);
                 i = i + 1;
             }
         } else {
@@ -629,10 +630,11 @@ impl Parser {
                 if c == stop || (c < " " && c != "\t") {
                     break;
                 }
+                out.push(c);
                 i = i + 1;
             }
         }
-        return i;
+        self.advance_cols(i);
     }
 
     // Appends the cursor's run up to `j` to `out` and moves past it.
@@ -921,7 +923,7 @@ impl Parser {
         self.bump();
         let out: Vec<byte> = Vec::new();
         while true {
-            self.take_run(out, self.plain_run_end("\"", true));
+            self.copy_run(out, "\"", true);
             if self.at_end() {
                 raise self.invalid();
             }
@@ -951,7 +953,7 @@ impl Parser {
         self.bump();
         let out: Vec<byte> = Vec::new();
         while true {
-            self.take_run(out, self.plain_run_end("'", false));
+            self.copy_run(out, "'", false);
             if self.at_end() {
                 raise self.invalid();
             }
@@ -1003,7 +1005,7 @@ impl Parser {
         let out: Vec<byte> = Vec::new();
         let q: byte = "'";
         while true {
-            self.take_run(out, self.plain_run_end(q, false));
+            self.copy_run(out, q, false);
             if self.at_end() {
                 raise self.invalid();
             }
@@ -1043,7 +1045,7 @@ impl Parser {
         let out: Vec<byte> = Vec::new();
         let q: byte = "\"";
         while true {
-            self.take_run(out, self.plain_run_end(q, true));
+            self.copy_run(out, q, true);
             if self.at_end() {
                 raise self.invalid();
             }

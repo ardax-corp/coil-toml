@@ -237,3 +237,9 @@ test("array newlines and comments") {
     let v = must_decode("a = [\n  1, # c\n  2\n]\n");
     assert!(v.get("a").array_len() == 2, "arr nl");
 }
+
+test("long string runs around escapes") {
+    let v = must_decode("s = \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN\\tabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN\"\np = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN\\abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN'\n");
+    assert!(v.get("s").s == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN\tabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN", "basic");
+    assert!(v.get("p").s == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN\\abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN", "literal");
+}
