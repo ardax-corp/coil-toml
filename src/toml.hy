@@ -1754,13 +1754,11 @@ impl Parser {
             if d < 0 {
                 raise TomlError::Number { line: line, column: column };
             }
-            let next = value * radix + d;
-            if value > 0 {
-                if next < value {
-                    raise TomlError::Number { line: line, column: column };
-                }
+            // Check before multiplying: integer overflow panics.
+            if value > (9223372036854775807 - d) / radix {
+                raise TomlError::Number { line: line, column: column };
             }
-            value = next;
+            value = value * radix + d;
             saw = true;
             j = j + 1;
         }

@@ -121,3 +121,21 @@ test("bad underscore") {
         },
     }, "1_");
 }
+
+fn is_number_error(Result<TomlValue, TomlError> r) -> bool {
+    return match r {
+        Result::Ok(_) => false,
+        Result::Err(e) => match e {
+            TomlError::Number { line, column } => line >= 1 && column >= 1,
+            default => false,
+        },
+    };
+}
+
+test("integer that overflows int") {
+    assert!(is_number_error(codec().decode_str("a = 99999999999999999999\n")), "decimal");
+    assert!(is_number_error(codec().decode_str("a = 9223372036854775808\n")), "int max + 1");
+    assert!(is_number_error(codec().decode_str("a = 0xffffffffffffffffff\n")), "hex");
+    let max = codec().decode_str("a = 9223372036854775807\n");
+    assert!(max.is_ok(), "int max decodes");
+}
