@@ -1,4 +1,7 @@
-// Package root. Coil-side TOML 1.0 encode/decode.
+// TOML 1.0 encode and decode in pure Coil.
+//
+// `Toml` is the codec, `TomlValue` a handle on a decoded or built value, and
+// `TomlError` the failure with a 1-based line and column.
 // Named-module recursive `Vec<TomlValue>` does not unify (`TomlValue` vs `toml::TomlValue`).
 // The tree is an arena of primitive vecs; TomlValue is a (store, idx) handle.
 use string::{from_bytes, to_bytes, format};
@@ -22,6 +25,7 @@ const FLT_FINITE: int = 0;
 const FLT_INF: int = 1;
 const FLT_NAN: int = 2;
 
+/// Internal arena storage behind `TomlValue`; not meant to be used directly.
 class Store {
     pub tags: Vec<int>,
     pub flags: Vec<bool>,
@@ -179,24 +183,80 @@ impl Store {
     }
 }
 
-/// Decode/encode failure. `line` and `column` are 1-based (column counts bytes in the line).
+/// Why a decode or encode failed.
+///
+/// Every variant carries the position of the failure: `line` and `column` are
+/// 1-based, and `column` counts bytes within the line. Malformed input is
+/// always reported as an error, never as a panic.
+///
+/// # Examples
+///
+/// ```
+/// use toml::{Toml, TomlError};
+/// use string::{format};
+/// # use tests::assert;
+/// let pos = match Toml::v1().decode_str("a = 1\na = 2\n") {
+///     Result::Ok(_) => "decoded",
+///     Result::Err(e) => match e {
+///         TomlError::Invalid { line, column } => format("duplicate key at %i:%i", line, column),
+///         default => "other error",
+///     },
+/// };
+/// assert!(pos == "duplicate key at 2:6");
+/// ```
 enum TomlError {
+    /// The input is not TOML: a syntax error, a duplicate key, a table
+    /// defined twice, or a bad string escape.
     Invalid { line: int, column: int },
+    /// The input is not valid UTF-8, or an encoded document could not be read
+    /// back as a `string` (`Toml::encode_str`).
     Utf8 { line: int, column: int },
+    /// A malformed or out-of-range number, such as `0x` or a leading zero.
     Number { line: int, column: int },
 }
 
-/// Strict TOML value. Tables/arrays are ordered children (`keys[child]` / child nodes).
+/// A TOML value: string, integer, float, boolean, date-time, array or table.
+///
+/// `TomlValue` is a handle on one node of a decoded tree (or of a scalar built
+/// with `from_*`), not an enum. Ask its type with the `is_*` predicates, read
+/// scalars from the `s`, `i`, `f` and `flag` fields, and walk containers with
+/// `get` / `has` (tables) and `child` / `key_at` (both).
+///
+/// A decoded document is always a table, in document order; the empty
+/// document is an empty table. An array of tables (`[[name]]`) is an array
+/// whose elements are tables. Dates and times keep their source text in `s`.
+///
+/// # Examples
+///
+/// ```
+/// use toml::{Toml, TomlValue};
+/// # use tests::assert;
+/// let doc = "title = \"demo\"\n\n[owner]\nname = \"ada\"\nborn = 1979-05-27\n";
+/// let v = Toml::v1().decode_str(doc).unwrap_or(TomlValue::empty_table());
+/// assert!(v.is_table() && v.table_len() == 2);
+/// assert!(v.get("title").s == "demo");
+/// let owner = v.get("owner");
+/// assert!(owner.get("name").s == "ada");
+/// assert!(owner.get("born").is_datetime() && owner.get("born").s == "1979-05-27");
+/// ```
 class TomlValue {
     store: Store,
     idx: int,
     tag: int,
+    /// The boolean payload when `is_bool()`. On a float that is infinite,
+    /// `true` for `-inf`.
     pub flag: bool,
+    /// The integer payload when `is_int()`. On a float, the kind: `0`
+    /// finite, `1` infinite, `2` NaN (check this rather than `f != f`).
     pub i: int,
+    /// The float payload when `is_float()`.
     pub f: float,
+    /// The string payload when `is_string()`, or the date-time text when
+    /// `is_datetime()`.
     pub s: string,
 }
 
+/// Internal parser state used by `Toml::decode`; not meant to be used directly.
 class Parser {
     bytes: Vec<byte>,
     i: int,
@@ -208,6 +268,7 @@ class Parser {
 }
 
 impl TomlValue {
+    /// Handle on node `idx` of `store`. Internal: used by the decoder.
     pub static fn wrap(Store store, int idx) -> TomlValue {
         return new TomlValue(
             store,
@@ -220,30 +281,60 @@ impl TomlValue {
         );
     }
 
+    /// A TOML string. Encoding writes a basic string with escapes as needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use toml::{Toml, TomlValue};
+    /// # use tests::assert;
+    /// let v = TomlValue::from_string("hi");
+    /// assert!(v.is_string() && v.s == "hi");
+    /// assert!(Toml::v1().encode_str(v).unwrap_or("") == "\"hi\"");
+    /// ```
     pub static fn from_string(string s) -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_STR, false, 0, 0.0, s, "");
         return TomlValue::wrap(st, idx);
     }
 
+    /// A TOML integer.
     pub static fn from_int(int n) -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_INT, false, n, 0.0, "", "");
         return TomlValue::wrap(st, idx);
     }
 
+    /// A TOML boolean.
     pub static fn from_bool(bool flag) -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_BOOL, flag, 0, 0.0, "", "");
         return TomlValue::wrap(st, idx);
     }
 
+    /// A date-time value with text `s`, written out unquoted as given.
+    ///
+    /// `s` is not checked: pass a valid TOML offset date-time, local
+    /// date-time, local date or local time (`1979-05-27T07:32:00Z`,
+    /// `1979-05-27`, `07:32:00`).
     pub static fn from_datetime(string s) -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_DT, false, 0, 0.0, s, "");
         return TomlValue::wrap(st, idx);
     }
 
+    /// A TOML float. Infinities and NaN are recorded in `i` and `flag` and
+    /// encode as `inf`, `-inf` and `nan`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use toml::{Toml, TomlValue};
+    /// # use tests::assert;
+    /// let v = TomlValue::from_float(-1.0 / 0.0);
+    /// assert!(v.i == 1 && v.flag);
+    /// assert!(Toml::v1().encode_str(v).unwrap_or("") == "-inf");
+    /// ```
     pub static fn from_float(float x) -> TomlValue {
         let st = Store::new();
         let kind = FLT_FINITE;
@@ -264,48 +355,75 @@ impl TomlValue {
         return TomlValue::wrap(st, idx);
     }
 
+    /// An empty table, such as the result of decoding an empty document.
+    /// It encodes as the empty string.
     pub static fn empty_table() -> TomlValue {
         let st = Store::new();
         let idx = st.add(TAG_TAB, false, KIND_EXPLICIT, 0.0, "", "");
         return TomlValue::wrap(st, idx);
     }
 
+    /// Returns `true` for a string.
     pub fn is_string() -> bool {
         return self.tag == TAG_STR;
     }
 
+    /// Returns `true` for an integer.
     pub fn is_int() -> bool {
         return self.tag == TAG_INT;
     }
 
+    /// Returns `true` for a float (including `inf` and `nan`).
     pub fn is_float() -> bool {
         return self.tag == TAG_FLOAT;
     }
 
+    /// Returns `true` for a boolean.
     pub fn is_bool() -> bool {
         return self.tag == TAG_BOOL;
     }
 
+    /// Returns `true` for a date, time or date-time.
     pub fn is_datetime() -> bool {
         return self.tag == TAG_DT;
     }
 
+    /// Returns `true` for an array (including an array of tables).
     pub fn is_array() -> bool {
         return self.tag == TAG_ARR;
     }
 
+    /// Returns `true` for a table (including an inline table).
     pub fn is_table() -> bool {
         return self.tag == TAG_TAB;
     }
 
+    /// Number of elements of an array. Use only when `is_array()`.
     pub fn array_len() -> int {
         return self.store.count_children(self.idx);
     }
 
+    /// Number of keys of a table. Use only when `is_table()`.
     pub fn table_len() -> int {
         return self.store.count_children(self.idx);
     }
 
+    /// Element `n` (0-based) of an array, or the value of the `n`th key of a
+    /// table, in document order.
+    ///
+    /// When `n` is out of range this returns the value itself, so check
+    /// `n` against `array_len` / `table_len` first.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use toml::{Toml, TomlValue};
+    /// # use tests::assert;
+    /// let doc = "[[bin]]\nname = \"a\"\n\n[[bin]]\nname = \"b\"\n";
+    /// let bins = Toml::v1().decode_str(doc).unwrap_or(TomlValue::empty_table()).get("bin");
+    /// assert!(bins.is_array() && bins.array_len() == 2);
+    /// assert!(bins.child(1).get("name").s == "b");
+    /// ```
     pub fn child(int n) -> TomlValue {
         let c = self.store.nth_child(self.idx, n);
         if c < 0 {
@@ -314,6 +432,17 @@ impl TomlValue {
         return TomlValue::wrap(self.store, c);
     }
 
+    /// The `n`th key (0-based) of a table, in document order, or `""` when
+    /// `n` is out of range.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use toml::{Toml, TomlValue};
+    /// # use tests::assert;
+    /// let v = Toml::v1().decode_str("b = 1\na = 2\n").unwrap_or(TomlValue::empty_table());
+    /// assert!(v.key_at(0) == "b" && v.key_at(1) == "a" && v.key_at(2) == "");
+    /// ```
     pub fn key_at(int n) -> string {
         let c = self.store.nth_child(self.idx, n);
         if c < 0 {
@@ -322,10 +451,26 @@ impl TomlValue {
         return self.store.keys[c];
     }
 
+    /// Returns `true` when this table has `key`.
     pub fn has(string key) -> bool {
         return self.store.find_child(self.idx, key) >= 0;
     }
 
+    /// The value of `key` in this table.
+    ///
+    /// When the key is absent this returns the table itself, so check `has`
+    /// first when the key may be missing. Dotted keys are nested tables:
+    /// `a.b = 1` is `get("a").get("b")`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use toml::{Toml, TomlValue};
+    /// # use tests::assert;
+    /// let v = Toml::v1().decode_str("server.port = 8080\n").unwrap_or(TomlValue::empty_table());
+    /// assert!(v.has("server") && !v.has("port"));
+    /// assert!(v.get("server").get("port").i == 8080);
+    /// ```
     pub fn get(string key) -> TomlValue {
         let c = self.store.find_child(self.idx, key);
         if c < 0 {
@@ -632,6 +777,7 @@ impl TomlValue {
         return ();
     }
 
+    /// Appends the encoding of this value to `out`, as `Toml::encode` does.
     pub fn emit(Vec<byte> out) -> Result<(), TomlError> {
         if self.store.tags[self.idx] != TAG_TAB {
             return self.emit_value(out, self.idx)?;
@@ -2193,23 +2339,62 @@ impl Parser {
     }
 }
 
-/// TOML 1.0 codec.
+/// A TOML 1.0 codec: one-shot decode of bytes or a string to a `TomlValue`,
+/// and encode back.
+///
+/// Decode covers the whole of TOML 1.0.0: comments, bare, quoted and dotted
+/// keys, basic and literal strings (multi-line too), integers in every radix,
+/// floats with `inf` / `nan`, booleans, date-times, arrays, inline tables,
+/// `[table]` headers and `[[array of tables]]`. Encode writes a table as
+/// `key = value` lines followed by `[table]` and `[[array]]` sections.
+///
+/// # Examples
+///
+/// ```
+/// use toml::{Toml, TomlValue, TomlError};
+/// # use tests::assert;
+/// let t = Toml::v1();
+/// let doc = "name = \"demo\"\nports = [80, 443]\n\n[server]\nhost = \"localhost\"\n";
+/// let out = match t.decode_str(doc) {
+///     Result::Ok(v) => t.encode_str(v).unwrap_or("encode failed"),
+///     Result::Err(_) => "decode failed",
+/// };
+/// assert!(out == "name = \"demo\"\nports = [80, 443]\n[server]\nhost = \"localhost\"\n");
+/// assert!(t.decode_str("name = ").is_err());
+/// ```
 class Toml {
     spec: int,
 }
 
 impl Toml {
-    /// TOML v1.0.0 encode/decode.
+    /// The TOML v1.0.0 codec.
     pub static fn v1() -> Toml {
         return new Toml(1);
     }
 
+    /// Encodes `value` as UTF-8 TOML bytes. A table becomes a document; any
+    /// other value is written as its TOML literal (`7`, `"hi"`).
     pub fn encode(TomlValue value) -> Result<Vec<byte>, TomlError> {
         let out: Vec<byte> = Vec::new();
         value.emit(out)?;
         return out;
     }
 
+    /// Decodes a TOML document from `bytes` into its root table.
+    ///
+    /// A leading UTF-8 byte order mark is skipped. Syntax errors and
+    /// duplicate keys or tables are `TomlError::Invalid`; malformed numbers
+    /// are `TomlError::Number`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use toml::{Toml, TomlValue};
+    /// use string::{to_bytes};
+    /// # use tests::assert;
+    /// let v = Toml::v1().decode(to_bytes("n = 0xff\n")).unwrap_or(TomlValue::empty_table());
+    /// assert!(v.get("n").i == 255);
+    /// ```
     pub fn decode(Vec<byte> bytes) -> Result<TomlValue, TomlError> {
         let _ = self.spec;
         let p = new Parser(bytes, 0, 1, 1, Store::new(), -1, -1);
@@ -2217,6 +2402,8 @@ impl Toml {
         return TomlValue::wrap(p.store, root);
     }
 
+    /// Encodes `value` as a TOML `string`: `encode`, then the bytes read as
+    /// UTF-8 (`TomlError::Utf8` if they are not).
     pub fn encode_str(TomlValue value) -> Result<string, TomlError> {
         let bytes = self.encode(value)?;
         return match from_bytes(bytes) {
@@ -2225,6 +2412,7 @@ impl Toml {
         };
     }
 
+    /// Decodes a TOML document from a string; same as `decode` on its bytes.
     pub fn decode_str(string s) -> Result<TomlValue, TomlError> {
         return self.decode(to_bytes(s))?;
     }
