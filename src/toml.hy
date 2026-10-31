@@ -25,7 +25,7 @@ const FLT_FINITE: int = 0;
 const FLT_INF: int = 1;
 const FLT_NAN: int = 2;
 
-/// Internal arena storage behind `TomlValue`; not meant to be used directly.
+// Internal arena storage behind `TomlValue`; not meant to be used directly.
 class Store {
     pub tags: Vec<int>,
     pub flags: Vec<bool>,
@@ -268,7 +268,7 @@ class Parser {
 }
 
 impl TomlValue {
-    /// Handle on node `idx` of `store`. Internal: used by the decoder.
+    // Internal: a handle on node `idx` of `store`, used by the decoder.
     pub static fn wrap(Store store, int idx) -> TomlValue {
         return new TomlValue(
             store,
