@@ -55,7 +55,7 @@ let n = t.decode_str("a = -42\n")?;
 let is_neg = n.get("a").is_int() && n.get("a").i == (0 - 42);
 ```
 
-A number token with no `.` / `e` / `E` / `inf` / `nan` that fits in i64 is an int. Otherwise it is a float. `inf` / `-inf` / `nan` use `i` as a kind (`1` inf, `2` nan) and `flag` for the sign of inf.
+A number token with no `.` / `e` / `E` / `inf` / `nan` is an int, and one outside i64 is `TomlError::Number` (TOML integers are 64-bit). Otherwise it is a float. `inf` / `-inf` / `nan` use `i` as a kind (`1` inf, `2` nan) and `flag` for the sign of inf.
 
 ### TomlError
 
