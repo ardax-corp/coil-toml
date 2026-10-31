@@ -4,7 +4,7 @@ Userland TOML 1.0 for [coil](https://github.com/ardax-corp/coil-lang). Package n
 
 Pure Coil encode/decode. No native library. The tree is an arena of primitive vecs; a `TomlValue` is a `(store, idx)` handle — named-module recursive `Vec<TomlValue>` does not unify (`TomlValue` vs `toml::TomlValue`).
 
-One module, `toml` (`src/toml.hy`): the `Toml` codec, the `TomlValue` handle it decodes to, and the `TomlError` it reports.
+One module, `toml` (`src/toml.coil`): the `Toml` codec, the `TomlValue` handle it decodes to, and the `TomlError` it reports.
 
 ## Example
 
@@ -33,7 +33,7 @@ fn main() {
 }
 ```
 
-Run it with `coil --root ../coil-stdlib/src --root ../coil-toml/src main.hy` (prints `port 8080`, then the document re-encoded).
+Run it with `coil --root ../coil-stdlib/src --root ../coil-toml/src main.coil` (prints `port 8080`, then the document re-encoded).
 
 ## API
 
@@ -71,7 +71,7 @@ Covered syntax: comments, bare/quoted/dotted keys, basic and literal strings (in
 
 | Path | Role |
 |------|------|
-| `src/toml.hy` | `Toml`, `TomlValue`, `TomlError`, parser/stringify |
+| `src/toml.coil` | `Toml`, `TomlValue`, `TomlError`, parser/stringify |
 | `coil.toml` | spool manifest (`[package] name = "toml"`); coil does not read it |
 
 ## Consume
@@ -89,7 +89,7 @@ No tags yet, so pin a commit. Without spool, pass `--root ../coil-toml/src` to `
 coil test --root ../coil-stdlib/src
 ```
 
-This runs `tests/` and the examples in the `///` docs of `src/toml.hy`.
+This runs `tests/` and the examples in the `///` docs of `src/toml.coil`.
 
 ## License
 
