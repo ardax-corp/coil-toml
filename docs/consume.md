@@ -35,8 +35,6 @@ let bytes = t.encode(v)?;
 
 `decode_str` is `to_bytes` then `decode`. `encode_str` is `encode` then `from_bytes`. A `from_bytes` failure on encode is `TomlError::Utf8`.
 
-Prefer matching directly on `decode` / `decode_str` results. Storing `Result<TomlValue, TomlError>` in a `let` before matching can mis-handle the payload until a compiler fix lands.
-
 ### TomlValue
 
 `TomlValue` is a class plus arena handle, not an enum. Nested tables and arrays come from decode. Scalar constructors:
