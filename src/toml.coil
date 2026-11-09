@@ -629,7 +629,6 @@ impl TomlValue {
         return ();
     }
 
-    #[max_depth(256)]
     fn emit_value(Vec<byte> out, int idx) -> Result<(), TomlError> {
         let tag = self.store.tags[idx];
         if tag == TAG_STR {
@@ -734,7 +733,6 @@ impl TomlValue {
         return parent + "." + ks;
     }
 
-    #[max_depth(256)]
     fn emit_table(Vec<byte> out, int idx, string path, bool emit_hdr, bool aot_elem) -> Result<(), TomlError> {
         if emit_hdr {
             if out.len() > 0 {
@@ -2128,7 +2126,6 @@ impl Parser {
         return ();
     }
 
-    #[max_depth(256)]
     fn parse_value() -> Result<int, TomlError> {
         if self.at_end() {
             raise self.invalid();
@@ -2198,7 +2195,6 @@ impl Parser {
         raise self.invalid();
     }
 
-    #[max_depth(256)]
     fn parse_array() -> Result<int, TomlError> {
         self.bump();
         let arr = self.store.add(TAG_ARR, false, ARR_VAL, 0.0, "", "");
@@ -2230,7 +2226,6 @@ impl Parser {
         return arr;
     }
 
-    #[max_depth(256)]
     fn parse_inline_table() -> Result<int, TomlError> {
         self.bump();
         let tab = self.store.add(TAG_TAB, false, KIND_INLINE, 0.0, "", "");
